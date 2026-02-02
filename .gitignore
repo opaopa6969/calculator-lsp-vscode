@@ -1,0 +1,44 @@
+# =========================
+# Node / npm
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# lock file is intentionally ignored (example project)
+package-lock.json
+
+# =========================
+# TypeScript build output
+# =========================
+out/
+dist/
+
+# =========================
+# VS Code extension
+# =========================
+.vscode/
+*.vsix
+!build/*.vsix
+
+# =========================
+# Java / Maven
+# =========================
+server/target/
+server-dist/*.jar
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Temporary / misc
+# =========================
+*.log
+.tmp/
+.temp/
+

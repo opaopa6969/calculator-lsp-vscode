@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260">
+  <style>
+    .box { fill: #ffffff; stroke: #111827; stroke-width: 2; rx: 16; ry: 16; }
+    .title { font: 600 18px sans-serif; fill: #111827; }
+    .text { font: 14px sans-serif; fill: #111827; }
+    .arrow { stroke: #111827; stroke-width: 2.5; fill: none; marker-end: url(#arrowhead); }
+    .note { font: 12px sans-serif; fill: #374151; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#111827"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="30" y="55" width="250" height="150"/>
+  <text class="title" x="55" y="90">VS Code</text>
+  <text class="text" x="55" y="118">Extension (TypeScript)</text>
+  <text class="text" x="55" y="142">vscode-languageclient</text>
+  <text class="note" x="55" y="170">opens .calc → requests completion</text>
+
+  <rect class="box" x="325" y="55" width="250" height="150"/>
+  <text class="title" x="350" y="90">LSP Server</text>
+  <text class="text" x="350" y="118">Java + LSP4J</text>
+  <text class="text" x="350" y="142">stdio transport</text>
+  <text class="note" x="350" y="170">publishes diagnostics</text>
+
+  <rect class="box" x="620" y="55" width="250" height="150"/>
+  <text class="title" x="645" y="90">unlaxer</text>
+  <text class="text" x="645" y="118">Parser → AST</text>
+  <text class="text" x="645" y="142">SuggestableParser</text>
+  <text class="note" x="645" y="170">single source: functions</text>
+
+  <path class="arrow" d="M280 130 L325 130"/>
+  <text class="note" x="285" y="115">LSP JSON-RPC</text>
+
+  <path class="arrow" d="M575 130 L620 130"/>
+  <text class="note" x="585" y="115">parse + suggest</text>
+
+  <text class="note" x="30" y="235">Flow: document text → unlaxer parse → diagnostics &amp; suggestions → VS Code UI</text>
+</svg>
