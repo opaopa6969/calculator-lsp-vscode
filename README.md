@@ -63,23 +63,25 @@ npm run compile
 ```
 
 ## Adding a new function (one place)
-Functions are defined once in `server/src/main/java/.../CalculatorParsers.java`:
+Functions are defined in their own parsers in `server/src/main/java/.../CalculatorParsers.java`:
 
 ```java
-public static List<FunctionCompletion> getFunctionCompletions() {
-    return List.of(
-        new FunctionCompletion("sin", "Sine function", "sin($1)"),
-        // ...
-        new FunctionCompletion("log", "Natural logarithm function", "log($1)")
-    );
+public static class SineFunctionParser extends WordParser implements FunctionSuggestable {
+    public SineFunctionParser() {
+        super("sin");
+    }
+
+    @Override
+    public FunctionCompletion getFunctionCompletion() {
+        return new FunctionCompletion("sin", "Sine function", "sin($1)");
+    }
 }
 ```
 
-That single list drives:
+Register the parser class in `getFunctionParserClasses()`. That drives:
 - Grammar (`FunctionNameParser`)
 - Completion (`SuggestableParser`)
 - Documentation
 
 ## Diagnostics: show expected tokens
 When parsing fails, the server publishes diagnostics. If unlaxer provides “expected tokens” metadata, the server adds it to the diagnostic message (best-effort extraction).
-

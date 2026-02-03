@@ -1,5 +1,6 @@
 package org.unlaxer.calculator;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,7 +31,7 @@ import org.unlaxer.parser.posix.DigitParser;
  * term     = factor (('*' | '/') factor)*
  * factor   = unary | number | '(' expr ')' | function
  * unary    = ('+' | '-') factor
- * function = ('sin' | 'sqrt' | 'cos' | 'tan') '(' expr ')'
+ * function = ('sin' | 'sqrt' | 'cos' | 'tan' | 'log') '(' expr ')'
  * number   = digit+ ('.' digit+)?
  */
 public class CalculatorParsers {
@@ -43,16 +44,85 @@ public class CalculatorParsers {
      * - documentation/examples
      */
     public static List<FunctionCompletion> getFunctionCompletions() {
-        return List.of(
-                new FunctionCompletion("sin", "Sine function", "sin($1)"),
-                new FunctionCompletion("sqrt", "Square root function", "sqrt($1)"),
-                new FunctionCompletion("cos", "Cosine function", "cos($1)"),
-                new FunctionCompletion("tan", "Tangent function", "tan($1)"),
-                new FunctionCompletion("log", "Natural logarithm function", "log($1)")
-        );
+        List<Class<? extends FunctionSuggestable>> parserClasses = getFunctionParserClasses();
+        List<FunctionCompletion> completions = new ArrayList<>();
+        for (Class<? extends FunctionSuggestable> parserClass : parserClasses) {
+            FunctionSuggestable parser = Parser.get(parserClass);
+            completions.add(parser.getFunctionCompletion());
+        }
+        return List.copyOf(completions);
     }
 
     public record FunctionCompletion(String name, String description, String insertText) {}
+
+    public interface FunctionSuggestable extends Parser {
+        FunctionCompletion getFunctionCompletion();
+    }
+
+    private static List<Class<? extends FunctionSuggestable>> getFunctionParserClasses() {
+        return List.of(
+                SineFunctionParser.class,
+                SquareRootFunctionParser.class,
+                CosineFunctionParser.class,
+                TangentFunctionParser.class,
+                LogarithmFunctionParser.class
+        );
+    }
+
+    public static class SineFunctionParser extends WordParser implements FunctionSuggestable {
+        public SineFunctionParser() {
+            super("sin");
+        }
+
+        @Override
+        public FunctionCompletion getFunctionCompletion() {
+            return new FunctionCompletion("sin", "Sine function", "sin($1)");
+        }
+    }
+
+    public static class SquareRootFunctionParser extends WordParser implements FunctionSuggestable {
+        public SquareRootFunctionParser() {
+            super("sqrt");
+        }
+
+        @Override
+        public FunctionCompletion getFunctionCompletion() {
+            return new FunctionCompletion("sqrt", "Square root function", "sqrt($1)");
+        }
+    }
+
+    public static class CosineFunctionParser extends WordParser implements FunctionSuggestable {
+        public CosineFunctionParser() {
+            super("cos");
+        }
+
+        @Override
+        public FunctionCompletion getFunctionCompletion() {
+            return new FunctionCompletion("cos", "Cosine function", "cos($1)");
+        }
+    }
+
+    public static class TangentFunctionParser extends WordParser implements FunctionSuggestable {
+        public TangentFunctionParser() {
+            super("tan");
+        }
+
+        @Override
+        public FunctionCompletion getFunctionCompletion() {
+            return new FunctionCompletion("tan", "Tangent function", "tan($1)");
+        }
+    }
+
+    public static class LogarithmFunctionParser extends WordParser implements FunctionSuggestable {
+        public LogarithmFunctionParser() {
+            super("log");
+        }
+
+        @Override
+        public FunctionCompletion getFunctionCompletion() {
+            return new FunctionCompletion("log", "Natural logarithm function", "log($1)");
+        }
+    }
 
 
 
@@ -107,27 +177,26 @@ public class CalculatorParsers {
     }
 
     /**
-     * Function name parser: 'sin' | 'sqrt' | 'cos' | 'tan'
+     * Function name parser: 'sin' | 'sqrt' | 'cos' | 'tan' | 'log'
      */
     public static class FunctionNameParser extends Choice {
         public FunctionNameParser() {
-    super(
-        Name.of("functionName"),
-        createFunctionNameParsers()
-    );
-}
+            super(
+                    Name.of("functionName"),
+                    createFunctionNameParsers()
+            );
+        }
 
-private static Parser[] createFunctionNameParsers() {
-    List<FunctionCompletion> completions = getFunctionCompletions();
-    Parser[] parsers = new Parser[completions.size()];
+        private static Parser[] createFunctionNameParsers() {
+            List<Class<? extends FunctionSuggestable>> parserClasses = getFunctionParserClasses();
+            Parser[] parsers = new Parser[parserClasses.size()];
 
-    for (int index = 0; index < completions.size(); index++) {
-        FunctionCompletion completion = completions.get(index);
-        parsers[index] = new WordParser(completion.name());
-    }
+            for (int index = 0; index < parserClasses.size(); index++) {
+                parsers[index] = Parser.get(parserClasses.get(index));
+            }
 
-    return parsers;
-}
+            return parsers;
+        }
     }
 
     /**
