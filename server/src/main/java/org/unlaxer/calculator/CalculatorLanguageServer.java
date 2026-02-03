@@ -391,19 +391,15 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
             String currentWord = content.substring(wordStart, offset).toLowerCase();
 
             // Function completions
-            List<FunctionCompletion> functions = List.of(
-                new FunctionCompletion("sin", "Sine function", "sin($1)"),
-                new FunctionCompletion("sqrt", "Square root function", "sqrt($1)"),
-                new FunctionCompletion("cos", "Cosine function", "cos($1)"),
-                new FunctionCompletion("tan", "Tangent function", "tan($1)")
-            );
+            List<CalculatorParsers.FunctionCompletion> functions =
+                    CalculatorParsers.getFunctionCompletions();
 
-            for (FunctionCompletion func : functions) {
-                if (func.name.startsWith(currentWord)) {
-                    CompletionItem item = new CompletionItem(func.name);
+            for (CalculatorParsers.FunctionCompletion func : functions) {
+                if (func.name().startsWith(currentWord)) {
+                    CompletionItem item = new CompletionItem(func.name());
                     item.setKind(CompletionItemKind.Function);
-                    item.setDetail(func.description);
-                    item.setInsertText(func.insertText);
+                    item.setDetail(func.description());
+                    item.setInsertText(func.insertText());
                     items.add(item);
                 }
             }
@@ -484,21 +480,6 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
             }
 
             return data;
-        }
-    }
-
-    /**
-     * Function completion info.
-     */
-    private static class FunctionCompletion {
-        final String name;
-        final String description;
-        final String insertText;
-
-        FunctionCompletion(String name, String description, String insertText) {
-            this.name = name;
-            this.description = description;
-            this.insertText = insertText;
         }
     }
 

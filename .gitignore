@@ -28,6 +28,9 @@ dist/
 # =========================
 server/target/
 server-dist/*.jar
+server/.classpath
+server/.project
+server/src.zip
 
 # =========================
 # OS / Editor
@@ -41,4 +44,3 @@ Thumbs.db
 *.log
 .tmp/
 .temp/
-
