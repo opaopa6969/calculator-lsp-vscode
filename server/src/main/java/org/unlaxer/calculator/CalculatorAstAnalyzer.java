@@ -429,7 +429,11 @@ public final class CalculatorAstAnalyzer {
             if (operator != null) {
                 return operator;
             }
-            return findFirstTokenByParserClass(token, CalculatorParsers.DivisionParser.class);
+            operator = findFirstTokenByParserClass(token, CalculatorParsers.DivisionParser.class);
+            if (operator != null) {
+                return operator;
+            }
+            return findFirstTokenByParserClass(token, CalculatorParsers.UnknownOperatorParser.class);
         }
 
         private Token findFirstFunctionToken(Token token) {
