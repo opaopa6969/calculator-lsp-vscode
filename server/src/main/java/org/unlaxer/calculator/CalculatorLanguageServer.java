@@ -12,6 +12,13 @@ import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionOptions;
 import org.eclipse.lsp4j.CompletionParams;
+import org.eclipse.lsp4j.CodeLens;
+import org.eclipse.lsp4j.CodeLensOptions;
+import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.HoverParams;
+import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
@@ -37,7 +44,6 @@ import org.eclipse.lsp4j.services.LanguageClientAware;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.eclipse.lsp4j.services.WorkspaceService;
-import org.unlaxer.CodePointIndex;
 import org.unlaxer.Parsed;
 import org.unlaxer.StringSource;
 import org.unlaxer.context.ParseContext;
@@ -54,6 +60,7 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
     private LanguageClient client;
     private final Map<String, DocumentState> documents = new HashMap<>();
     private final SuggestableParser suggestableParser = new CalculatorSuggestableParser();
+    private final CalculatorAstAnalyzer astAnalyzer = new CalculatorAstAnalyzer();
     private final CalculatorTextDocumentService textDocumentService;
 
     public CalculatorLanguageServer() {
@@ -82,6 +89,14 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
             List.of()
         ));
         capabilities.setSemanticTokensProvider(semanticTokensOptions);
+
+        // Hover support
+        capabilities.setHoverProvider(true);
+
+        // CodeLens support
+        CodeLensOptions codeLensOptions = new CodeLensOptions();
+        codeLensOptions.setResolveProvider(false);
+        capabilities.setCodeLensProvider(codeLensOptions);
 
         return CompletableFuture.completedFuture(new InitializeResult(capabilities));
     }
@@ -140,14 +155,15 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
             result
         );
 
-        DocumentState state = new DocumentState(uri, content, parseResult);
+        CalculatorAstAnalyzer.AnalysisResult analysis = astAnalyzer.analyze(content, parseResult);
+        DocumentState state = new DocumentState(uri, content, parseResult, analysis);
         documents.put(uri, state);
 
         context.close();
 
         // Publish diagnostics
         if (client != null) {
-            publishDiagnostics(uri, content, parseResult);
+            publishDiagnostics(state);
         }
 
         return parseResult;
@@ -156,8 +172,22 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
     /**
      * Publish diagnostics (errors) to the client.
      */
-    private void publishDiagnostics(String uri, String content, ParseResult result) {
+    private void publishDiagnostics(DocumentState state) {
         List<Diagnostic> diagnostics = new ArrayList<>();
+
+        List<CalculatorAstAnalyzer.AstError> astErrors = state.analysis.errors();
+        for (CalculatorAstAnalyzer.AstError astError : astErrors) {
+            Diagnostic diagnostic = new Diagnostic();
+            diagnostic.setRange(astError.range());
+            diagnostic.setSeverity(DiagnosticSeverity.Error);
+            diagnostic.setMessage(astError.message());
+            diagnostic.setSource("calculator");
+            diagnostics.add(diagnostic);
+        }
+
+        ParseResult result = state.parseResult;
+        String content = state.content;
+        String uri = state.uri;
 
         if (result.consumedLength < result.totalLength) {
             // Part of the input is invalid
@@ -269,7 +299,28 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
         return List.of(String.valueOf(expectedObject));
     }
 
-/**
+    /**
+     * Check if a position is inside the range.
+     */
+    private static boolean isPositionInRange(Position position, Range range) {
+        if (position.getLine() < range.getStart().getLine()) {
+            return false;
+        }
+        if (position.getLine() > range.getEnd().getLine()) {
+            return false;
+        }
+        if (position.getLine() == range.getStart().getLine()
+                && position.getCharacter() < range.getStart().getCharacter()) {
+            return false;
+        }
+        if (position.getLine() == range.getEnd().getLine()
+                && position.getCharacter() > range.getEnd().getCharacter()) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Convert character offset to LSP Position.
      */
     private Position offsetToPosition(String content, int offset) {
@@ -293,11 +344,14 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
         public final String uri;
         public final String content;
         public final ParseResult parseResult;
+        public final CalculatorAstAnalyzer.AnalysisResult analysis;
 
-        public DocumentState(String uri, String content, ParseResult parseResult) {
+        public DocumentState(String uri, String content, ParseResult parseResult,
+                CalculatorAstAnalyzer.AnalysisResult analysis) {
             this.uri = uri;
             this.content = content;
             this.parseResult = parseResult;
+            this.analysis = analysis;
         }
     }
 
@@ -355,6 +409,69 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
         @Override
         public void didSave(DidSaveTextDocumentParams params) {
             // No special handling needed
+        }
+
+        @Override
+        public CompletableFuture<Hover> hover(HoverParams params) {
+            String uri = params.getTextDocument().getUri();
+            Position position = params.getPosition();
+
+            DocumentState state = server.getDocuments().get(uri);
+            if (state == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            String hoverText = null;
+            for (CalculatorAstAnalyzer.AstError error : state.analysis.errors()) {
+                if (isPositionInRange(position, error.range())) {
+                    hoverText = error.message();
+                    break;
+                }
+            }
+
+            if (hoverText == null && state.analysis.hasValue()) {
+                hoverText = "= " + state.analysis.value();
+            }
+
+            if (hoverText == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            MarkupContent content = new MarkupContent();
+            content.setKind("plaintext");
+            content.setValue(hoverText);
+            Hover hover = new Hover(content);
+            return CompletableFuture.completedFuture(hover);
+        }
+
+        @Override
+        public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
+            String uri = params.getTextDocument().getUri();
+            DocumentState state = server.getDocuments().get(uri);
+            if (state == null) {
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            }
+
+            if (state.content.isEmpty()) {
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            }
+
+            String title = null;
+            if (false == state.analysis.errors().isEmpty()) {
+                title = "Error: " + state.analysis.errors().get(0).message();
+            } else if (state.analysis.hasValue()) {
+                title = "= " + state.analysis.value();
+            }
+
+            if (title == null) {
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            }
+
+            Range range = new Range(new Position(0, 0), new Position(0, 0));
+            Command command = new Command(title, "calculator.showResult");
+            CodeLens lens = new CodeLens(range);
+            lens.setCommand(command);
+            return CompletableFuture.completedFuture(List.of(lens));
         }
 
         @Override
