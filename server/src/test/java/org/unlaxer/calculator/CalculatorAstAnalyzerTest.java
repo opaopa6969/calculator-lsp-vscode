@@ -66,6 +66,19 @@ public class CalculatorAstAnalyzerTest {
     }
 
     @Test
+    public void reportsUnknownOperatorFromParser() {
+        CalculatorLanguageServer server = new CalculatorLanguageServer();
+        String uri = "file:///unknown-operator.calc";
+
+        server.parseDocument(uri, "1^2");
+        CalculatorLanguageServer.DocumentState state = server.getDocuments().get(uri);
+
+        assertTrue(false == state.analysis.errors().isEmpty());
+        assertTrue(state.analysis.errors().stream()
+                .anyMatch(error -> error.message().contains("不明な二項演算子")));
+    }
+
+    @Test
     public void reportsUnmatchedClosingParenthesis() {
         CalculatorLanguageServer server = new CalculatorLanguageServer();
         String uri = "file:///closing.calc";

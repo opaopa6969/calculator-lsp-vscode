@@ -20,6 +20,7 @@ import org.unlaxer.parser.combinator.OneOrMore;
 import org.unlaxer.parser.combinator.ZeroOrMore;
 import org.unlaxer.parser.elementary.MappedSingleCharacterParser;
 import org.unlaxer.parser.elementary.MultipleParser;
+import org.unlaxer.parser.elementary.SingleCharacterParser;
 import org.unlaxer.parser.elementary.WordParser;
 import org.unlaxer.parser.posix.DigitParser;
 
@@ -150,6 +151,25 @@ public class CalculatorParsers {
     public static class DotParser extends MappedSingleCharacterParser {
         public DotParser() {
             super('.');
+        }
+    }
+
+    /**
+     * Unknown operator parser (accepts non-alphanumeric symbols except known tokens).
+     */
+    public static class UnknownOperatorParser extends SingleCharacterParser {
+        @Override
+        public boolean isMatch(char target) {
+            if (Character.isLetterOrDigit(target)) {
+                return false;
+            }
+            if (Character.isWhitespace(target)) {
+                return false;
+            }
+            if (target == '(' || target == ')' || target == '.') {
+                return false;
+            }
+            return target != '+' && target != '-' && target != '*' && target != '/';
         }
     }
 
@@ -298,7 +318,8 @@ public class CalculatorParsers {
         public AddOpParser() {
             super(
                 PlusParser.class,
-                MinusParser.class
+                MinusParser.class,
+                UnknownOperatorParser.class
             );
         }
     }
