@@ -44,3 +44,10 @@ Thumbs.db
 *.log
 .tmp/
 .temp/
+target/
+build/
+__pycache__/
+.gradle/
+.next/
+.nuxt/
+bower_components/
