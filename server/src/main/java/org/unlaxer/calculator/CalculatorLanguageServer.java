@@ -324,7 +324,7 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
     /**
      * Convert character offset to LSP Position.
      */
-    private Position offsetToPosition(String content, int offset) {
+    private static Position offsetToPosition(String content, int offset) {
         int line = 0;
         int column = 0;
         for (int i = 0; i < offset && i < content.length(); i++) {
@@ -567,6 +567,10 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
          * Build semantic tokens data.
          * Format: [deltaLine, deltaStart, length, tokenType, tokenModifiers]
          * tokenType: 0=valid, 1=invalid
+         *
+         * <p>Per the LSP specification, a token must not span multiple lines.
+         * A span that crosses a newline is split into one token per line.
+         * deltaLine and deltaStart are relative to the previous emitted token.</p>
          */
         private List<Integer> buildSemanticTokens(String content, ParseResult result) {
             List<Integer> data = new ArrayList<>();
@@ -576,29 +580,86 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
             }
 
             int validEnd = result.consumedLength;
+            int prevLine = 0;
+            int prevChar = 0;
 
             // Valid portion (green)
             if (validEnd > 0) {
-                // deltaLine=0, deltaStart=0, length=validEnd, tokenType=0 (valid), modifiers=0
-                data.add(0);
-                data.add(0);
-                data.add(validEnd);
-                data.add(0); // valid
-                data.add(0);
+                int[] tail = appendSpanTokens(data, content, 0, validEnd, 0, prevLine, prevChar);
+                prevLine = tail[0];
+                prevChar = tail[1];
             }
 
             // Invalid portion (red)
             if (validEnd < content.length()) {
-                int invalidLength = content.length() - validEnd;
-                // deltaLine=0, deltaStart=validEnd (relative to previous), length, tokenType=1 (invalid)
-                data.add(0);
-                data.add(validEnd);
-                data.add(invalidLength);
-                data.add(1); // invalid
-                data.add(0);
+                appendSpanTokens(data, content, validEnd, content.length(), 1, prevLine, prevChar);
             }
 
             return data;
+        }
+
+        /**
+         * Emit one or more 5-int tokens for a [start, end) character span of the
+         * given tokenType, splitting at newlines. Newline characters themselves
+         * are not emitted as tokens (they carry no highlight).
+         *
+         * @return int[2] = { line of last emitted token, char offset after last
+         *                   emitted token on that line (for chaining) }
+         */
+        private static int[] appendSpanTokens(List<Integer> data, String content,
+                int start, int end, int tokenType, int prevLine, int prevChar) {
+            int line = prevLine;
+
+            int segStart = start;
+            // Skip a leading newline so a span that starts with '\n' does not
+            // emit a zero-length token; it simply begins on the next line.
+            while (segStart < end && isLineBreak(content.charAt(segStart))) {
+                segStart++;
+            }
+            if (segStart >= end) {
+                return new int[] { line, prevChar };
+            }
+            Position segStartPos = offsetToPosition(content, segStart);
+            int segStartLine = segStartPos.getLine();
+            int segStartChar = segStartPos.getCharacter();
+
+            for (int i = segStart; i < end; i++) {
+                boolean newline = isLineBreak(content.charAt(i));
+                int next = i + 1;
+                if (newline || next == end) {
+                    int segEnd = newline ? i : next;
+                    int len = segEnd - segStart;
+                    if (len > 0) {
+                        int deltaLine = segStartLine - line;
+                        int deltaStart = (deltaLine == 0)
+                                ? (segStartChar - prevChar)
+                                : segStartChar;
+                        data.add(deltaLine);
+                        data.add(deltaStart);
+                        data.add(len);
+                        data.add(tokenType);
+                        data.add(0);
+                        line = segStartLine;
+                        prevChar = segStartChar + len;
+                    }
+                    if (newline) {
+                        segStart = next;
+                        while (segStart < end && isLineBreak(content.charAt(segStart))) {
+                            segStart++;
+                        }
+                        if (segStart < end) {
+                            segStartPos = offsetToPosition(content, segStart);
+                            segStartLine = segStartPos.getLine();
+                            segStartChar = segStartPos.getCharacter();
+                        }
+                    }
+                }
+            }
+            return new int[] { line, prevChar };
+        }
+
+        private static boolean isLineBreak(char c) {
+            return c == '\n' || c == '\r';
         }
     }
 
