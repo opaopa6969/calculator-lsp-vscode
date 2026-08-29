@@ -27,6 +27,7 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.DidSaveTextDocumentParams;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.InitializeResult;
+import org.eclipse.lsp4j.InsertTextFormat;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.eclipse.lsp4j.Range;
@@ -517,6 +518,7 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
                     item.setKind(CompletionItemKind.Function);
                     item.setDetail(func.description());
                     item.setInsertText(func.insertText());
+                    item.setInsertTextFormat(InsertTextFormat.Snippet);
                     items.add(item);
                 }
             }
