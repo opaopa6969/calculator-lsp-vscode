@@ -86,7 +86,7 @@ public class CalculatorLanguageServer implements LanguageServer, LanguageClientA
             new SemanticTokensWithRegistrationOptions();
         semanticTokensOptions.setFull(true);
         semanticTokensOptions.setLegend(new SemanticTokensLegend(
-            List.of("valid", "invalid", "function", "number", "operator"),
+            List.of("valid", "invalid"),
             List.of()
         ));
         capabilities.setSemanticTokensProvider(semanticTokensOptions);
